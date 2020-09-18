@@ -62,6 +62,13 @@ Also 4-byte frames
 |                       	|       	|                                      	|                                             	|   	|
 
 
+Relay Board:
+* Shift Register - https://www.ti.com/lit/ds/symlink/sn74hc595.pdf
+* Transistors    - https://www.ti.com/lit/ds/symlink/uln2803a.pdf
+* LED Display    - https://optoelectronics.liteon.com/upload/download/DS-30-92-0810/LTA-1000HR.pdf
+* Resistor Netwrk- https://www.bourns.com/docs/Product-Datasheets/4600x.pdf
+* Relay          - https://content.kemet.com/datasheets/KEM_R7002_EC2_EE2.pdf
+
 
 References
 * https://github.com/huin/goserial
@@ -71,3 +78,7 @@ References
 * http://www.krekr.nl/wp-content/uploads/2013/08/Arduino-uno.pdf
 * https://www.raspberrypi.org/documentation/hardware/raspberrypi/mechanical/rpi_MECH_3b_1p2.pdf
 * https://www.youtube.com/watch?v=ioSYlxHlYdI (For solenoid board design)
+* https://jlcpcb.com/ - Cheap PCB!
+* https://www.ti.com/lit/ds/symlink/sn74hc595.pdf
+* https://www.ti.com/lit/ds/symlink/uln2803a.pdf?
+* https://www.digikey.com/products/en/optoelectronics/leds-circuit-board-indicators-arrays-light-bars-bar-graphs/106?k=&pkeyword=&sv=0&pv207=317983&sf=1&FV=69%7C411897%2C-8%7C106&quantity=&ColumnSort=1000011&page=1&stock=1&pageSize=25
