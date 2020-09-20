@@ -1,0 +1,1 @@
+tinygo flash -target=arduino -port /dev/ttyS1 . && cat /dev/ttyS1
