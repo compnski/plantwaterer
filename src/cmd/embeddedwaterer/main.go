@@ -1,50 +1,30 @@
 package main
 
-import (	
-	"machine"
+import (
 	"device/avr"
-	"runtime/interrupt"
+	"machine"
 )
 
-type ADC interface {
-	Get() uint16
-	Configure()
-}
-
-type Pin interface {
-	High()
-	Low()
-	Configure(machine.PinConfig)
-}
-
-
-var t = uint32(0)
-
-func trackTime(interrupt.Interrupt) {
-	t++
-	//	println(t)
-}
-
-var seconds = uint16(0)
-
-
-func sendStats(mm *MoistureMonitor) {
+func sendStats(mm *MoistureMonitor, sm *WaterSectionManager) {
 	// Send all stats
 	for _, data := range mm.Data {
 		println(
-			data.Samples[0].At,"=",data.Samples[0].Value,", ",
-			data.Samples[1].At,"=",data.Samples[1].Value,", ",
-			data.Samples[2].At,"=",data.Samples[2].Value,", ",
-			data.Samples[3].At,"=",data.Samples[3].Value,", ",
-			data.Samples[4].At,"=",data.Samples[4].Value,", ",
-			data.Samples[5].At,"=",data.Samples[5].Value,", ",
-			data.Samples[6].At,"=",data.Samples[6].Value,", ",
-			data.Samples[7].At,"=",data.Samples[7].Value,", ",
-			data.Samples[8].At,"=",data.Samples[8].Value,", ",
-			data.Samples[9].At,"=",data.Samples[9].Value,", ",
+			data.Samples[0].At, "=", data.Samples[0].Value, ", ",
+			data.Samples[1].At, "=", data.Samples[1].Value, ", ",
+			data.Samples[2].At, "=", data.Samples[2].Value, ", ",
+			data.Samples[3].At, "=", data.Samples[3].Value, ", ",
+			data.Samples[4].At, "=", data.Samples[4].Value, ", ",
+			data.Samples[5].At, "=", data.Samples[5].Value, ", ",
+			data.Samples[6].At, "=", data.Samples[6].Value, ", ",
+			data.Samples[7].At, "=", data.Samples[7].Value, ", ",
+			data.Samples[8].At, "=", data.Samples[8].Value, ", ",
+			//			data.Samples[9].At, "=", data.Samples[9].Value, ", ",
 		)
 	}
-	
+	for idx := range sm.Sections {
+		schedule := sm.Schedules[idx]
+		println(idx, schedule.IsOn(), schedule.NextActionAt)
+	}
 }
 
 func PutUint16(b []byte, v uint16) {
@@ -53,93 +33,52 @@ func PutUint16(b []byte, v uint16) {
 	b[1] = byte(v >> 8)
 }
 
-
-type WaterControlDevice struct {
-	Pin Pin
-}
-
-func (d *WaterControlDevice) Open() {
-	d.Pin.High()
-}
-
-func (d *WaterControlDevice) Close() {
-	d.Pin.Low()
-}
-
-type WaterSection struct {
-	Devices []*WaterControlDevice
-	WaterSectionId int8
-}
-
-func (s *WaterSection) Open() {
-	for _, device := range s.Devices {
-		device.Open()
-	}
-}
-
-func (s *WaterSection) Close() {
-	for _, device := range s.Devices {
-		device.Close()
-	}
-}
-
-type SectionSchedule struct {
-	OnSeconds, OffSeconds uint16
-	NextOnSecond, NextOffSecond uint16
-	WaterSectionId int8
-	State bool
-}
-
-type WaterSectionManager struct {
-	Sections map[int8]WaterSection
-	Schedules []SectionSchedule
-}
-
-
-
-
-
 func main() {
-	machine.InitADC()
+	initMachine()
+	initTiming()
 
-	avr.TIMSK0.Set(avr.TIMSK0_TOIE0)
-	avr.TCCR0B.Set(avr.TCCR0B_CS00)
-	avr.TIFR0.Set(avr.TIFR0_TOV0)
-	interrupt.New(avr.IRQ_TIMER0_OVF, trackTime)
-	
 	cps := machine.CPUFrequency() / 256
 
-	machine.UART0.Configure(machine.UARTConfig{BaudRate:115200})
-	println("Hello! CPS=",cps)
+	machine.UART0.Configure(machine.UARTConfig{BaudRate: 115200})
+	println("Hello! CPS=", cps)
 	led := machine.LED
 	led.Configure(machine.PinConfig{Mode: machine.PinOutput})
 	led.Low()
 
-	adcMulti := NewADCMultiplexer(machine.ADC0, machine.D2, machine.D3, machine.D4)
+	adcMulti := NewADCMultiplexer(MoistureIn, MoistureOut0, MoistureOut1, MoistureOut2)
 	moistureMonitor := NewMoistureMonitor(8, adcMulti)
 	_ = moistureMonitor
-	
-	for ;; {
+
+	sections := []*WaterSection{NewWaterSection(PumpOut0, ValveOut0),
+		NewWaterSection(PumpOut0, ValveOut1),
+		NewWaterSection(PumpOut0, ValveOut2),
+		NewWaterSection(PumpOut0, ValveOut3)}
+	sectionManager := NewWaterSectionManager(sections...)
+
+	sectionManager.Update(0, 6, 60, seconds+1)
+	sectionManager.Update(1, 6, 60, seconds+2)
+	sectionManager.Update(2, 6, 60, seconds+3)
+	sectionManager.Update(3, 6, 60, seconds+4)
+
+	for {
 		led.High()
 
 		led.Low()
 		println("z")
 		//time.Sleep(time.Second)
-		for ;; {
+		for {
 			//println(t);
 			if t >= cps {
-				moistureMonitor.CheckAll()
-				sendStats(moistureMonitor)
 				t = 0
 				seconds++
+				sectionManager.Process(seconds)
+				moistureMonitor.CheckAll(seconds)
+				sendStats(moistureMonitor, sectionManager)
+
 				break
 			}
 			avr.Asm("nop")
 			//runtime.Sleep()
 		}
 	}
-	
-	
 }
-
-
