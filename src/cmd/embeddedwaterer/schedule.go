@@ -1,17 +1,5 @@
 package main
 
-type SectionSchedule struct {
-	OnSeconds, OffSeconds timeUnit
-	WaterSectionID        waterSectionID
-	// state
-	NextActionAt timeUnit
-	isOn         bool
-}
-
-func (s *SectionSchedule) IsOn() bool {
-	return s.isOn
-}
-
 type WaterSectionManager struct {
 	Sections  []*WaterSection
 	Schedules []*SectionSchedule
@@ -31,46 +19,14 @@ func NewWaterSectionManager(sections ...*WaterSection) *WaterSectionManager {
 	return m
 }
 
-func (s *SectionSchedule) ShouldTurnOn(n timeUnit) bool {
-	return !s.isOn && s.NextActionAt < n && s.OnSeconds > 0
-}
-
-func (s *SectionSchedule) ShouldTurnOff(n timeUnit) bool {
-	return s.isOn && s.NextActionAt < n && s.OffSeconds > 0
-}
-
-func (s *SectionSchedule) On(n timeUnit) {
-	s.NextActionAt = n + s.OnSeconds
-	s.isOn = true
-}
-
-func (s *SectionSchedule) Off(n timeUnit) {
-	s.NextActionAt = n + s.OffSeconds
-	s.isOn = false
-}
-
-func (wsm *WaterSectionManager) SectionOn(idx waterSectionID) {
-	if int(idx) < len(wsm.Sections) {
-		wsm.Sections[idx].On()
-	}
-}
-
-func (wsm *WaterSectionManager) SectionOff(idx waterSectionID) {
-	if int(idx) < len(wsm.Sections) {
-		wsm.Sections[idx].Off()
-	}
-}
-
-func (wsm *WaterSectionManager) Process(n timeUnit) {
+func (wsm *WaterSectionManager) Process(now timeUnit) {
 	if schedule := wsm.IsOn(); schedule != nil {
-		if schedule.ShouldTurnOff(n) {
-			schedule.Off(n)
-			wsm.SectionOff(schedule.WaterSectionID)
+		if schedule.ShouldTurnOff(now) {
+			wsm.sectionOff(now, schedule.WaterSectionID)
 		}
 	} else if schedule := wsm.NextChange(); schedule != nil {
-		if schedule.ShouldTurnOn(n) {
-			schedule.On(n)
-			wsm.SectionOn(schedule.WaterSectionID)
+		if schedule.ShouldTurnOn(now) {
+			wsm.sectionOn(now, schedule.WaterSectionID)
 		}
 	}
 }
@@ -79,8 +35,7 @@ func (wsm *WaterSectionManager) AllOff(now timeUnit) (anyOn bool) {
 	for id, schedule := range wsm.Schedules {
 		if schedule.isOn {
 			anyOn = true
-			schedule.Off(now)
-			wsm.SectionOff(waterSectionID(id))
+			wsm.sectionOff(now, waterSectionID(id))
 		}
 	}
 	return
@@ -93,41 +48,48 @@ func (wsm *WaterSectionManager) ForceOn(idx waterSectionID, now timeUnit) (succe
 	if int(idx) < len(wsm.Schedules) {
 		schedule := wsm.Schedules[int(idx)]
 		if !schedule.isOn {
-			schedule.On(now)
-			wsm.SectionOn(idx)
+			wsm.sectionOn(now, idx)
 		}
 	}
 	return
 }
 
-func (wsm *WaterSectionManager) Update(idx waterSectionID, on, off, nextActionAt timeUnit) {
+func (wsm *WaterSectionManager) Update(idx waterSectionID, on, off uint16, nextActionAt timeUnit) bool {
 	if int(idx) < len(wsm.Schedules) {
 		schedule := wsm.Schedules[int(idx)]
 		schedule.OnSeconds = on
 		schedule.OffSeconds = off
 		schedule.NextActionAt = nextActionAt
+		return true
 	}
+	return false
 }
 
-func (wsm *WaterSectionManager) UpdateOnSeconds(idx waterSectionID, n timeUnit) {
+func (wsm *WaterSectionManager) UpdateOnSeconds(idx waterSectionID, n uint16) bool {
 	if int(idx) < len(wsm.Schedules) {
 		schedule := wsm.Schedules[int(idx)]
 		schedule.OnSeconds = n
+		return true
 	}
+	return false
 }
 
-func (wsm *WaterSectionManager) UpdateOffSeconds(idx waterSectionID, n timeUnit) {
+func (wsm *WaterSectionManager) UpdateOffSeconds(idx waterSectionID, n uint16) bool {
 	if int(idx) < len(wsm.Schedules) {
 		schedule := wsm.Schedules[int(idx)]
 		schedule.OffSeconds = n
+		return true
 	}
+	return false
 }
 
-func (wsm *WaterSectionManager) UpdateNextActionAt(idx waterSectionID, n timeUnit) {
+func (wsm *WaterSectionManager) UpdateNextActionAt(idx waterSectionID, n timeUnit) bool {
 	if int(idx) < len(wsm.Schedules) {
 		schedule := wsm.Schedules[int(idx)]
 		schedule.NextActionAt = n
+		return true
 	}
+	return false
 }
 
 func (wsm *WaterSectionManager) NextChange() *SectionSchedule {
@@ -150,4 +112,48 @@ func (wsm *WaterSectionManager) IsOn() *SectionSchedule {
 		}
 	}
 	return nil
+}
+
+func (wsm *WaterSectionManager) sectionOn(now timeUnit, idx waterSectionID) {
+	if int(idx) < len(wsm.Sections) {
+		wsm.Sections[idx].On()
+		wsm.Schedules[idx].On(now)
+	}
+}
+
+func (wsm *WaterSectionManager) sectionOff(now timeUnit, idx waterSectionID) {
+	if int(idx) < len(wsm.Sections) {
+		wsm.Sections[idx].Off()
+		wsm.Schedules[idx].Off(now)
+	}
+}
+
+type SectionSchedule struct {
+	OnSeconds, OffSeconds uint16
+	WaterSectionID        waterSectionID
+	// state
+	NextActionAt timeUnit
+	isOn         bool
+}
+
+func (s *SectionSchedule) IsOn() bool {
+	return s.isOn
+}
+
+func (s *SectionSchedule) ShouldTurnOn(n timeUnit) bool {
+	return !s.isOn && s.NextActionAt < n && s.OnSeconds > 0
+}
+
+func (s *SectionSchedule) ShouldTurnOff(n timeUnit) bool {
+	return s.isOn && s.NextActionAt < n && s.OffSeconds > 0
+}
+
+func (s *SectionSchedule) On(n timeUnit) {
+	s.NextActionAt = n + timeUnit(s.OnSeconds)
+	s.isOn = true
+}
+
+func (s *SectionSchedule) Off(n timeUnit) {
+	s.NextActionAt = n + timeUnit(s.OffSeconds)
+	s.isOn = false
 }

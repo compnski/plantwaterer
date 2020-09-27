@@ -1,8 +1,11 @@
 package main
 
 import (
+	"device/avr"
 	"machine"
 )
+
+const SampleBufferSize = 10
 
 type ADCMultiplexer struct {
 	// Apparently there is no garbage collection? TBD how much this static allocation is needed
@@ -67,8 +70,7 @@ func (b *SampleBuffer) Initialize(n int8) {
 func (b *SampleBuffer) Add(now timeUnit, value uint16) {
 	b.Samples[b.WriteIndex].Value = value
 	b.Samples[b.WriteIndex].At = now
-	println(b.WriteIndex,
-		b.Samples[b.WriteIndex].Value,
+	println(b.Samples[b.WriteIndex].Value,
 		b.Samples[b.WriteIndex].At)
 
 	b.WriteIndex = (b.WriteIndex + 1) % b.MaxSamples
@@ -79,8 +81,6 @@ type MoistureMonitor struct {
 	NumSensors     int8
 	Data           []SampleBuffer
 }
-
-const SampleBufferSize = 10
 
 func NewMoistureMonitor(numMonitors int8, m *ADCMultiplexer) *MoistureMonitor {
 	mm := &MoistureMonitor{
@@ -95,7 +95,9 @@ func NewMoistureMonitor(numMonitors int8, m *ADCMultiplexer) *MoistureMonitor {
 }
 
 func (mm *MoistureMonitor) Check(now timeUnit, n int8) {
+	//n = 3
 	mm.ADCMultiplexer.SelectInput(n)
+	avr.Asm("nop\nnop\nnop")
 	mm.Data[n].Add(now, mm.ADCMultiplexer.Read())
 	//time.Sleep(time.Millisecond)
 	//mm.Data[n].Add(mm.ADCMultiplexer.Read())
