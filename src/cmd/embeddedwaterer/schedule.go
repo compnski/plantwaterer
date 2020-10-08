@@ -42,19 +42,20 @@ func (wsm *WaterSectionManager) AllOff(now timeUnit) (anyOn bool) {
 }
 
 func (wsm *WaterSectionManager) ForceOn(idx waterSectionID, now timeUnit) (success bool) {
-	if wsm.IsOn != nil {
+	if wsm.IsOn() != nil {
 		return
 	}
 	if int(idx) < len(wsm.Schedules) {
 		schedule := wsm.Schedules[int(idx)]
 		if !schedule.isOn {
 			wsm.sectionOn(now, idx)
+			success = true
 		}
 	}
 	return
 }
 
-func (wsm *WaterSectionManager) Update(idx waterSectionID, on, off uint16, nextActionAt timeUnit) bool {
+func (wsm *WaterSectionManager) Update(idx waterSectionID, on, off timeUnit, nextActionAt timeUnit) bool {
 	if int(idx) < len(wsm.Schedules) {
 		schedule := wsm.Schedules[int(idx)]
 		schedule.OnSeconds = on
@@ -65,7 +66,7 @@ func (wsm *WaterSectionManager) Update(idx waterSectionID, on, off uint16, nextA
 	return false
 }
 
-func (wsm *WaterSectionManager) UpdateOnSeconds(idx waterSectionID, n uint16) bool {
+func (wsm *WaterSectionManager) UpdateOnSeconds(idx waterSectionID, n timeUnit) bool {
 	if int(idx) < len(wsm.Schedules) {
 		schedule := wsm.Schedules[int(idx)]
 		schedule.OnSeconds = n
@@ -74,7 +75,7 @@ func (wsm *WaterSectionManager) UpdateOnSeconds(idx waterSectionID, n uint16) bo
 	return false
 }
 
-func (wsm *WaterSectionManager) UpdateOffSeconds(idx waterSectionID, n uint16) bool {
+func (wsm *WaterSectionManager) UpdateOffSeconds(idx waterSectionID, n timeUnit) bool {
 	if int(idx) < len(wsm.Schedules) {
 		schedule := wsm.Schedules[int(idx)]
 		schedule.OffSeconds = n
@@ -129,11 +130,13 @@ func (wsm *WaterSectionManager) sectionOff(now timeUnit, idx waterSectionID) {
 }
 
 type SectionSchedule struct {
-	OnSeconds, OffSeconds uint16
+	OnSeconds, OffSeconds timeUnit
 	WaterSectionID        waterSectionID
 	// state
-	NextActionAt timeUnit
-	isOn         bool
+	NextActionAt      timeUnit
+	isOn              bool
+	OnAccum, OffAccum timeUnit
+	LastActionAt      timeUnit
 }
 
 func (s *SectionSchedule) IsOn() bool {
@@ -151,9 +154,13 @@ func (s *SectionSchedule) ShouldTurnOff(n timeUnit) bool {
 func (s *SectionSchedule) On(n timeUnit) {
 	s.NextActionAt = n + timeUnit(s.OnSeconds)
 	s.isOn = true
+	s.OffAccum += now() - s.LastActionAt
+	s.LastActionAt = now()
 }
 
 func (s *SectionSchedule) Off(n timeUnit) {
 	s.NextActionAt = n + timeUnit(s.OffSeconds)
 	s.isOn = false
+	s.OnAccum += now() - s.LastActionAt
+	s.LastActionAt = now()
 }
