@@ -1,4 +1,4 @@
-package main
+package hardware
 
 import "machine"
 
@@ -27,7 +27,6 @@ func NewWaterSection(pins ...Pin) *WaterSection {
 
 type WaterSection struct {
 	Devices []*WaterControlDevice
-	//	WaterSectionID waterSectionID
 }
 
 func (s *WaterSection) On() {

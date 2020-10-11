@@ -1,4 +1,4 @@
-package main
+package hardware
 
 import (
 	"machine"
@@ -46,6 +46,8 @@ var (
 	//RasbPiSerialRx machine.Pin = machine.D12
 )
 
-func initMachine() {
+func Initialize() {
 	machine.InitADC()
+	machine.UART0.Configure(machine.UARTConfig{BaudRate: 115200})
+	machine.LED.Configure(machine.PinConfig{Mode: machine.PinOutput})
 }
