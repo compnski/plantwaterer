@@ -63,6 +63,7 @@ func NewMoistureMonitor(numMonitors int8, m MultiADC) *MoistureMonitor {
 // Returns SampleStatsToReturn items, which MUST BE less than SampleBufferSize
 
 func (mm *MoistureMonitor) SendStats(now timing.TimeUnit) {
+	print("[")
 	for idx, data := range mm.Data {
 		print(util.MaybeLeadingComma(idx), `{"id":`, idx, `,"d":[`)
 		for sampleIdx := 0; sampleIdx < SampleStatsToReturn; sampleIdx++ {
@@ -71,6 +72,7 @@ func (mm *MoistureMonitor) SendStats(now timing.TimeUnit) {
 		}
 		println("]}")
 	}
+	print("]")
 }
 
 // MoistureSensorCheckDelay is a number of ticks to wait between selecting a moisture sensor
