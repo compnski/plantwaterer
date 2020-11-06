@@ -1,0 +1,11 @@
+[Unit]
+Description=Read serial port
+
+[Service]
+User=pi
+WorkingDirectory=/home/pi
+ExecStart=/bin/bash -c 'multilog s16777215 n100 /home/pi/serialStream < /dev/serial0'
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

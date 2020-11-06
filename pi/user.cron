@@ -1,0 +1,6 @@
+# Edit this file to introduce tasks to be run by cron.
+#
+# m h  dom mon dow   command
+*/1 * * * * ~/ensure_ssh_tunnel.sh >> tunnel.log 2>&1
+*/5 * * * * uvccapture -x1920 -y1080 -o/home/pi/captures/$(date -Iseconds | sed s/://g).jpg >> capture.log 2>&1
+0 * * * * ~/rsync_to_remote.sh >> sync.log 2>&1
