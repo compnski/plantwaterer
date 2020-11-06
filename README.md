@@ -5,72 +5,79 @@
 
 embeddedwaterer: Tinygo program for a microcontroller that waters on a fixed schedule.
 watererserver: Go program for rasberryPI that communicates with the embedded application to report stat and control remotely.
-
+Currently is a standalone parser that emits CSVs with stats data.
 
 ## Big Features:
 * Soil humidity sensors
 * Multiple relays, allows different water circuits
-* Read stats / update config via web
-
-## Maybe Features:
-* Webcam for monitoring, maybe time-lapse?
-* Awair integration?
-* Humidity based control, water when soil dries past certain threshold
-
+* Read stats / update config remotely
+* Webcam for monitoring, takes snapshots
 
 ## Arduino
-Turns relays on/off for specified on/off periods.
-Takes commands, sends stats back over serial.
-Monitors humidity sensors, reports back to Pi
-Store customization data in EEPROM?
+* Turns relays on/off for specified on/off periods.
+* Takes commands, sends stats back over serial.
+* Monitors humidity sensors, reports back to Pi
+
+### Future Plans
+* Humidity based control, water when soil dries past certain threshold
+* Store customization data in EEPROM
 
 ## Raspberry Pi
-Simple go service, hosts website.
-Polls Arduino via serial link on some interval. Keeps state of last values to show deltas.
-If Arduino resets, Pi should automatically reset the water on/off durations if they’ve been changed.
+* Currently just records serial data to disk for later analysis
+* Takes webcam snapshot every 5 minutes
+
+### Future Plans
+* Simple go service, hosts website.
+* Polls Arduino via serial link on some interval. Keeps state of last values to show deltas.
+* If Arduino resets, Pi monitor should automatically reset the water on/off durations if they’ve been changed.
+* Awair integration to pull in room humidity/temp/co2 levels
 
 ## Serial Link
-4-byte request
-Request: `<command> <8bit number> <16bit number>`
+More details on the linux side in the pi/README.md, and the hardware side in hardware/README.md
+In general, standard arduino serial at 115200 baud.
+
+
+3-byte header, 4-byte request
+Request: `CMD <command> <8bit number> <16bit number>`
 Response: Echo command back. Stats is special and will then send stats followed by a terminator.
 
-Commands
+### Commands
 | command                	| value 	| args?                                	| Notes                                                	|   	|
 |------------------------	|-------	|--------------------------------------	|------------------------------------------------------	|---	|
-| stats                  	| 0x01  	| -                                    	|                                                      	|   	|
 | water_on               	| 0x02  	| 8bit water id                        	| Resets water timer                                   	|   	|
 | water_off              	| 0x03  	| 8bit water id                        	| Resets water time                                    	|   	|
 | set_water_on_duration  	| 0x04  	| 8bit water id 16bit duration seconds 	|                                                      	|   	|
 | set_water_off_duration 	| 0x05  	| 8bit water id 16bit duration seconds 	|                                                      	|   	|
 | set_next_water_at      	| 0x06  	| 8bit sensor id 16bit value           	| Sets wait time to desired value. Useful after resets 	|   	|
-| zero_stats             	| 0x07  	| -                                    	|                                                      	|   	|
+
+To send a command, echo over the serial link.
+`echo -e 'CMD\x03\x00\x00\x00' > /dev/serial0`
 
 
-Stats Return
-Also 4-byte frames
-| name                  	| value 	| args                                 	| notes                                       	|   	|
-|-----------------------	|-------	|--------------------------------------	|---------------------------------------------	|---	|
-| total_water_secs      	| 0x01  	| 8bit water id 16bit duration seconds 	| Per-water loop                              	|   	|
-| total_water_days      	| 0x02  	| 8bit water id 16bit duration seconds 	| I think numbers are max 16bit               	|   	|
-| total_wait_secs       	| 0x03  	| 8bit water id 16bit duration days    	|                                             	|   	|
-| total_wait_days       	| 0x04  	| 8bit water id 16bit duration days    	| I think numbers are max 16bit               	|   	|
-| since_last_water_secs 	| 0x05  	| 8bit water id 16bit duration seconds 	| Per-water loop                              	|   	|
-| current_water_secs    	| 0x06  	| 8bit water id 16bit duration seconds 	| Per-water loop, 0 if not currently watering 	|   	|
-| moisture_current      	| 0x07  	| 8bit sensor id 16bit value           	| Per sensor                                  	|   	|
-| moisture_max          	| 0x08  	| 8bit sensor id 16bit value           	| Per sensor                                  	|   	|
-| moisture_min          	| 0x09  	| 8bit sensor id 16bit value           	| Per sensor                                  	|   	|
-|                       	|       	|                                      	|                                             	|   	|
+### Stats Return:
+Stats are continually sent via serial every StatsIntervalSeconds, default of 5.
+
+``` json
+{"now": 1485775,
+"sensors":[
+ {"id": 0, "d":[ 1, 37440, 2, 37376, 3, 37376, 4, 37440, 5, 37440 ]},
+ {"id": 1, "d":[ 1, 37376, 2, 37440, 3, 37376, 4, 37376, 5, 37376 ]}
+],"sections":[
+ {"id": 0, "on": false, "next": 1555513, "last": 1296313, 
+ "onTime": 50, "offTime": 259200, 
+ "onAcc": 306, "offAcc": 1296007 }
+]}
+```
+
+Notes:
+* Number of sensors and length of history is determined at compile-time. It is limited by the memory capacity of your chip. More powerful chips can support more sensors and longer histories.
+* All timestamps are relative to the local epoch, when the board was turned on.
+* The data in sensors.d are pairs of (timestamp, value) from the analog input. 
+* onTime / offTime are current status values
+* onAcc / offAcc accumulate time spent in on / off states over time
 
 
-Relay Board:
-* Shift Register - https://www.ti.com/lit/ds/symlink/sn74hc595.pdf
-* Transistors    - https://www.ti.com/lit/ds/symlink/uln2803a.pdf
-* LED Display    - https://optoelectronics.liteon.com/upload/download/DS-30-92-0810/LTA-1000HR.pdf
-* Resistor Netwrk- https://www.bourns.com/docs/Product-Datasheets/4600x.pdf
-* Relay          - https://content.kemet.com/datasheets/KEM_R7002_EC2_EE2.pdf
-
-
-References
+## References
 * https://github.com/huin/goserial
 * https://www.digikey.com/product-detail/en/adafruit-industries-llc/997/1528-2003-ND/6827136
 * https://tinygo.org/
@@ -81,4 +88,4 @@ References
 * https://jlcpcb.com/ - Cheap PCB!
 * https://www.ti.com/lit/ds/symlink/sn74hc595.pdf
 * https://www.ti.com/lit/ds/symlink/uln2803a.pdf?
-* https://www.digikey.com/products/en/optoelectronics/leds-circuit-board-indicators-arrays-light-bars-bar-graphs/106?k=&pkeyword=&sv=0&pv207=317983&sf=1&FV=69%7C411897%2C-8%7C106&quantity=&ColumnSort=1000011&page=1&stock=1&pageSize=25
+
